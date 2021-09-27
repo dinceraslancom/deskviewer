@@ -1,0 +1,8 @@
+numpy == 1.20.3
+mss==6.1.0
+websockets==10.0
+asyncio==3.4.3
+uvloop==0.16.0
+PyQt5==5.15.4
+pyautogui==0.9.53
+opencv-python-headless==4.5.3.56
