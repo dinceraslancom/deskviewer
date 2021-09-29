@@ -17,7 +17,7 @@ with open("README.rst", "r", encoding="utf8") as f:
 
 setup(
     name='deskviewer',
-    version='0.0.1',
+    version='0.0.2',
     package_dir={'deskviewer': 'deskviewer'},
     author="Dincer Aslan",
     author_email="dinceraslan.com@gmail.com",
@@ -40,6 +40,7 @@ setup(
         "console_scripts": [
             "deskviewer.publish = deskviewer.server:main",
             "deskviewer.connect = deskviewer.client:main",
+            "deskviewer = deskviewer.main:main",
         ]
     },
 )

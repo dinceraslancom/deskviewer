@@ -28,7 +28,7 @@ Publish the computer and control it remotely.
     $ deskviewer.publish
     Server Starting 0.0.0.0:8765
 
-    $ deskviewer.connect -h 192.168.x.x
+    $ deskviewer.connect -H 192.168.x.x
     Connecting Server 192.168.x.x:8765
 
     or
@@ -36,7 +36,7 @@ Publish the computer and control it remotely.
     $ python -m deskviewer.server
     Server Starting 0.0.0.0:8765
 
-    $ python -m deskviewer.client
+    $ python -m deskviewer.client -H 192.168.x.x
     Connecting Server 192.168.x.x:8765
 
 
@@ -48,26 +48,28 @@ Support Basic Authentication
 
 Quality options low and high
 
-serve args :
+deskviewer.publish  args (serve):
  * -u --username
  * -p --password
- * -h --host
+ * -b --bind
  * --port
+ * -h --help
 
-client args :
+deskviewer.connect args (client):
  * -u --username
  * -p --password
- * -h --host
+ * -H --host
  * -q --quality ( Options: low, high | default: high)
  * --port
+ * -h --help
 
 .. code-block:: bash
 
-    $ deskviewer.publish -u user -p pass -h 0.0.0.0 --port 8765
+    $ deskviewer.publish -u user -p pass -b 0.0.0.0 --port 8765
     Server Starting 0.0.0.0:8765
 
 
-    $ deskviewer.connect -u user -p pass -h 192.168.x.x --port 8765 --quality high
+    $ deskviewer.connect -u user -p pass -H 192.168.x.x --port 8765 --quality high
     Connecting Server 192.168.x.x:8765
 
 
