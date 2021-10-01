@@ -21,11 +21,20 @@ pyautogui.FAILSAFE = False
 
 WIDTH, HEIGHT = pyautogui.size()
 
-events_queue = Queue()
-
 AUTHORIZATION = None
 
 sys.stderr = open(os.devnull, 'a')
+
+
+class EventsQueue(Queue):
+    """ Created for handle with same command stack """
+
+    def __contains__(self, item):
+        with self.mutex:
+            return item in self.queue
+
+
+events_queue = EventsQueue()
 
 
 class FrameService:
@@ -159,10 +168,10 @@ def events_handler():
             # Keyboard
 
             elif constant.KEY_PRESS == e and c in constant.MODIFIER_KEYS:
-                Thread(target=delay_press, args=(c,), daemon=True)
+                Thread(target=delay_press, args=(c,), daemon=True).start()
 
             elif constant.KEY_PRESS == e:
-                pyautogui.press(e)
+                pyautogui.press(c)
 
 
 Thread(target=events_handler, daemon=True).start()
@@ -185,6 +194,10 @@ async def screen_handler(websocket, path, *args, **kwargs):
         events = eval(await websocket.recv())
 
         for event in events:
+
+            if event in events_queue:
+                continue
+
             events_queue.put(event)
 
         frame_cropped, box = frame_service.get()
