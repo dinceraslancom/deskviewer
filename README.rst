@@ -46,7 +46,7 @@ Advanced Usage
 
 Support Basic Authentication
 
-Quality options low and high
+Quality options low | medium | high
 
 deskviewer.publish  args (serve):
  * -u --username
@@ -59,7 +59,7 @@ deskviewer.connect args (client):
  * -u --username
  * -p --password
  * -H --host
- * -q --quality ( Options: low, high | default: high)
+ * -q --quality ( Options: low | medium | high | default: medium)
  * --port
  * -h --help
 

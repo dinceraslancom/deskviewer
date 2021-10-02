@@ -2,8 +2,8 @@ import asyncio
 import base64
 import http
 import os
-import pickle
 import sys
+import zlib
 from queue import Queue
 from threading import Thread
 from time import sleep
@@ -11,7 +11,6 @@ from time import sleep
 import cv2
 import mss
 import numpy
-import numpy as np
 import pyautogui
 import websockets
 
@@ -40,18 +39,33 @@ events_queue = EventsQueue()
 class FrameService:
     def __init__(self, quality):
         self.scale = getattr(constant, quality.upper() + '_SCALE')
+        self.quality = getattr(constant, quality.upper() + '_QUALITY')
         self.last_frame_gray = None
         self.sct = mss.mss()
         self.monitor = self.sct.monitors[0]
 
     def screenshot(self):
         """ Handle with screenshot """
+
         return self.sct.grab(self.monitor)
 
-    def resize(self, img):
+    @staticmethod
+    def resize(img, scale):
         height, width = img.shape[:2]
-        return cv2.resize(img,
-                          (int(width / self.scale), int(height / self.scale)))
+        return cv2.resize(img, (int(width * scale), int(height * scale)))
+
+    @staticmethod
+    def crop(frame, box):
+        x_min, y_min, x_max, y_max = box
+        return frame[y_min: y_max, x_min: x_max]
+
+    @staticmethod
+    def compress(img, quality):
+        """ Handle with compress image """
+
+        return zlib.compress(
+            cv2.imencode('.jpg', img,
+                         [int(cv2.IMWRITE_JPEG_QUALITY), quality])[1].tobytes())
 
     @staticmethod
     def convert_to_cv2(sct_img):
@@ -93,34 +107,29 @@ class FrameService:
         y_max = max(boundings_y)
         return x_min, y_min, x_max, y_max
 
-    @staticmethod
-    def crop(frame, box):
-        x_min, y_min, x_max, y_max = box
-        return frame[y_min: y_max, x_min: x_max]
-
     def get(self):
         if self.last_frame_gray is None:
             ss = self.screenshot()
             frame = self.convert_to_cv2(ss)
-            frame = self.resize(frame)
+            frame = self.resize(frame, self.scale)
             self.last_frame_gray = self.convert_to_gray(frame)
             height, width = frame.shape[:2]
-            return frame, (0, width, 0, height)
+            frame_compressed = self.compress(frame, self.quality)
+            return frame_compressed, (0, width, 0, height)
 
         ss = self.screenshot()
         frame = self.convert_to_cv2(ss)
-        frame = self.resize(frame)
+        frame = self.resize(frame, self.scale)
         frame_gray = self.convert_to_gray(frame)
 
         box = self.get_bounding_box(self.last_frame_gray, frame_gray)
-
         if not box:
             return None, None
 
         self.last_frame_gray = frame_gray
         frame_cropped = self.crop(frame, box)
-
-        return frame_cropped, box
+        frame_compressed = self.compress(frame_cropped, self.quality)
+        return frame_compressed, box
 
 
 def delay_press(key):
@@ -137,41 +146,45 @@ def events_handler():
 
             e, c = events_queue.get()
 
-            # Mouse
+            try:
+                # Mouse
 
-            if constant.MOUSE_DOWN == e:
-                pyautogui.mouseDown(x=c[0] * WIDTH,
-                                    y=c[1] * HEIGHT,
-                                    button=c[2])
+                if constant.MOUSE_DOWN == e:
+                    pyautogui.mouseDown(x=c[0] * WIDTH,
+                                        y=c[1] * HEIGHT,
+                                        button=c[2])
 
-            elif constant.MOUSE_UP == e:
-                pyautogui.mouseUp(x=c[0] * WIDTH,
-                                  y=c[1] * HEIGHT,
-                                  button=c[2])
-
-            elif constant.MOUSE_DOUBLE_CLICK == e:
-                pyautogui.doubleClick(x=c[0] * WIDTH,
+                elif constant.MOUSE_UP == e:
+                    pyautogui.mouseUp(x=c[0] * WIDTH,
                                       y=c[1] * HEIGHT,
                                       button=c[2])
 
-            elif constant.MOUSE_MOVE == e:
-                pyautogui.moveTo(x=c[0] * WIDTH,
-                                 y=c[1] * HEIGHT,
-                                 button=c[2])
+                elif constant.MOUSE_DOUBLE_CLICK == e:
+                    pyautogui.doubleClick(x=c[0] * WIDTH,
+                                          y=c[1] * HEIGHT,
+                                          button=c[2])
 
-            elif constant.SCROLL_DOWN == e:
-                pyautogui.scroll(-c)
+                elif constant.MOUSE_MOVE == e:
+                    pyautogui.moveTo(x=c[0] * WIDTH,
+                                     y=c[1] * HEIGHT,
+                                     button=c[2])
 
-            elif constant.SCROLL_UP == e:
-                pyautogui.scroll(c)
+                elif constant.SCROLL_DOWN == e:
+                    pyautogui.scroll(-c)
 
-            # Keyboard
+                elif constant.SCROLL_UP == e:
+                    pyautogui.scroll(c)
 
-            elif constant.KEY_PRESS == e and c in constant.MODIFIER_KEYS:
-                Thread(target=delay_press, args=(c,), daemon=True).start()
+                # Keyboard
 
-            elif constant.KEY_PRESS == e:
-                pyautogui.press(c)
+                elif constant.KEY_PRESS == e and c in constant.MODIFIER_KEYS:
+                    Thread(target=delay_press, args=(c,), daemon=True).start()
+
+                elif constant.KEY_PRESS == e:
+                    pyautogui.press(c)
+
+            except Exception as e:
+                print(e)
 
 
 Thread(target=events_handler, daemon=True).start()
@@ -203,8 +216,9 @@ async def screen_handler(websocket, path, *args, **kwargs):
         frame_cropped, box = frame_service.get()
 
         if box:
-            await websocket.send(bytes(str(box).encode()))
-            await websocket.send(pickle.dumps(np.array(frame_cropped)))
+            await websocket.send(str(box).encode())
+            await websocket.send(frame_cropped)
+
         else:
             await websocket.send('')
             await websocket.send('')

@@ -1,6 +1,6 @@
 import asyncio
-import pickle
 import sys
+import zlib
 from threading import Thread
 
 import cv2
@@ -129,29 +129,39 @@ class MainWindow(QMainWindow):
             self.label.setFixedHeight(self.current_height)
             self.label.setFixedWidth(self.current_width)
 
+    @staticmethod
+    def decompress(img):
+        """ Handle with decompress image package """
+
+        return cv2.imdecode(
+            np.frombuffer(
+                zlib.decompress(img),
+                np.uint8
+            ).reshape(1, -1),
+            cv2.IMREAD_COLOR)
+
     def update_frame(self, frame, box):
         self.update_label_size()
 
         if not (box and frame):
             return
 
-        frame_cv2 = cv2.cvtColor(
-            np.array(pickle.loads(frame)),
-            cv2.COLOR_BGRA2BGR
-        )
-
         if self.current_frame is not None:
             x_min, y_min, x_max, y_max = eval(box)
-            self.current_frame[y_min: y_max, x_min: x_max] = frame_cv2
+            self.current_frame[y_min: y_max, x_min: x_max] = self.decompress(frame)
         else:
-            self.current_frame = frame_cv2
+            self.current_frame = self.decompress(frame)
 
         height, width = self.current_frame.shape[:2]
 
         self.label.setPixmap(
             QPixmap(
-                QImage(self.current_frame, width, height,
-                       QImage.Format_RGB888).rgbSwapped()
+                QImage(
+                    self.current_frame,
+                    width,
+                    height,
+                    QImage.Format_BGR888
+                )
             ).scaled(self.current_width, self.current_height))
 
 
